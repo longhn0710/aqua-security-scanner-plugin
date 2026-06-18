@@ -109,9 +109,7 @@ public class ScannerExecuter {
 					args.add("-v", scannerPath+":/aquasec/scannercli:Z", "--entrypoint=/aquasec/scannercli");
 				}
 
-				if(!isPodmanRootlessScan) {
-					args.addTokenized(runOptions);
-				}
+				args.addTokenized(runOptions);
 
 				if(isDocker){
 					args.add("--rm", "-v", "/var/run/docker.sock:/var/run/docker.sock", aquaScannerImage, "scan", "--host", apiURL, "--local", localImage);	
