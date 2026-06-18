@@ -62,25 +62,23 @@ public class ScannerExecuter {
 				containerRuntime = "docker";
 				isDocker = true;
 			}
-			boolean toScanImageWithPodman = !isDocker && !runtimeDirectory.isEmpty();
+			boolean isPodmanRootlessScan = !isDocker && !runtimeDirectory.isEmpty();
 
 			args.add(containerRuntime);
 			args.add("run");
 			
 			String podmanSocketString = "";
-			if (!isDocker) {
-				/*
-				 * If customer provides XDG_RUNTIME_DIR, we are enabling image scan
-				 * using rootless podman container else we do file system scan
-				 * Refer - https://docs.aquasec.com/saas/image-and-function-scanning/scanning-manually-with-cli/scanner-cli-scan-command/scanner-cli-command-syntax/
-				 * */
-				if(!runtimeDirectory.isEmpty()) {
-					String podmanSocket = runtimeDirectory + PODMAN_SOCKET_SUFFIX;
-					podmanSocketString = podmanSocket + ":" + podmanSocket;
-					args.addTokenized("-e XDG_RUNTIME_DIR=" + runtimeDirectory);
-					args.add("--security-opt");
-					args.addTokenized("label=" + "disable");
-				}
+			/*
+			 * If customer provides XDG_RUNTIME_DIR, we are enabling image scan
+			 * using rootless podman container else we do file system scan
+			 * Refer - https://docs.aquasec.com/saas/image-and-function-scanning/scanning-manually-with-cli/scanner-cli-scan-command/scanner-cli-command-syntax/
+			 * */
+			if(isPodmanRootlessScan) {
+				String podmanSocket = runtimeDirectory + PODMAN_SOCKET_SUFFIX;
+				podmanSocketString = podmanSocket + ":" + podmanSocket;
+				args.addTokenized("-e XDG_RUNTIME_DIR=" + runtimeDirectory);
+				args.add("--security-opt");
+				args.addTokenized("label=" + "disable");
 			}
 
 			String buildJobName = env.get("JOB_NAME").trim();
@@ -111,14 +109,14 @@ public class ScannerExecuter {
 					args.add("-v", scannerPath+":/aquasec/scannercli:Z", "--entrypoint=/aquasec/scannercli");
 				}
 
-				if(!isDocker && runtimeDirectory.isEmpty()) {
+				if(!isPodmanRootlessScan) {
 					args.addTokenized(runOptions);
 				}
 
 				if(isDocker){
 					args.add("--rm", "-v", "/var/run/docker.sock:/var/run/docker.sock", aquaScannerImage, "scan", "--host", apiURL, "--local", localImage);	
 				} else {
-					if(!runtimeDirectory.isEmpty()) {
+					if(isPodmanRootlessScan) {
 						args.add("--rm", "-v", podmanSocketString, aquaScannerImage, "scan", "--host", apiURL, "--local", localImage);
 					} else {
 						args.add("--rm", "-u", "root", localImage, "scan", "--host", apiURL);
@@ -163,7 +161,7 @@ public class ScannerExecuter {
                 args.add("--hide-base");
             }
 
-			if(toScanImageWithPodman) {
+			if(isPodmanRootlessScan) {
 				args.addTokenized("--socket=" + "podman");
 			} else if(!isDocker && runtimeDirectory.isEmpty()) {
 				args.add("--image-name", localImage);
